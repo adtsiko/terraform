@@ -1,4 +1,8 @@
-
+terraform{
+    backend "s3"{
+        key = "2-terraform_state/dev/stage/services/web_cluster/terraform.tfstate"
+    }
+}
 //AWS Provider
 provider "aws" {
   region = "eu-west-2"
@@ -9,12 +13,7 @@ resource "aws_launch_configuration" "launch_config" {
         image_id = "ami-0f9124f7452cdb2a6"
         instance_type = "t2.micro"
         security_groups = [aws_security_group.allow_tls.id]
-
-        user_data = <<-EOF
-              #!/bin/bash
-              echo "Hello, World" > index.html
-              nohup busybox httpd -f -p ${var.server_port} &
-              EOF  
+        user_data = data.template_file.user_data.rendered
        lifecycle {
             create_before_destroy = true
         }
@@ -128,22 +127,18 @@ resource aws_security_group "allow_tls" {
         cidr_blocks = ["0.0.0.0/0"]
      }
 
-
-
 }
 
+data "template_file" "user_data" {
+  template = file("user-data.sh")
 
-variable "server_port" {
-    description = "Port for HTTP requests"
-    type = number
-    default = 8080
-}
-output "alb_dns_name" {
-    value = aws_lb.aplication_load_balancer.dns_name
-    description = "DNS of the load balancer"
+  vars = {
+    server_port = var.server_port
+    db_address = data.terraform_remote_state.db.outputs.address
+    db_port = data.terraform_remote_state.db.outputs.port
+  }
   
 }
-
 data "aws_vpc" "default"{
     default = true
 }
@@ -151,3 +146,16 @@ data "aws_vpc" "default"{
 data "aws_subnet_ids" "default"{
     vpc_id = data.aws_vpc.default.id
 } 
+
+
+data "terraform_remote_state" "db" {
+    backend = "s3"
+
+    config = {
+      bucket = "terraform-up-and-running-state-anesu-tsiko"
+      key = "stage/data-stores/mysql/terraform.tfstate"
+      region = "eu-west-2"
+    }
+
+  
+}
