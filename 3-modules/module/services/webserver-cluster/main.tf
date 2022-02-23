@@ -1,3 +1,11 @@
+locals {
+  http_port = 80
+  any_port = 0
+  any_protocol = "-1"
+  tcp_protocol = "tcp"
+  all_ips = ["0.0.0.0/0"]
+}
+
 terraform{
     backend "s3"{
         key = "2-terraform_state/dev/stage/services/web_cluster/terraform.tfstate"
@@ -29,7 +37,7 @@ resource "aws_lb" "aplication_load_balancer" {
 
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.aplication_load_balancer.arn
-  port = 80
+  port = local.http_port
   protocol = "HTTP"
 
   # By default return a 404 page
@@ -99,18 +107,18 @@ resource "aws_security_group" "alb" {
     name = "${var.cluster_name}_alb"
     #Allow HTTP inbound requests
     ingress {
-        from_port = 80
-        to_port = 80
+        from_port = local.http_port
+        to_port = local.http_port
         protocol = "tcp"
         cidr_blocks = ["0.0.0.0/0"]
     }
 
     #Allow outbound requests
     egress {
-        from_port = 0
-        to_port = 0
-        protocol = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
+        from_port = local.any_port
+        to_port = local.any_port
+        protocol = local.any_protocol
+        cidr_blocks = local.all_ips
     }
   
 }
@@ -123,8 +131,8 @@ resource aws_security_group "allow_tls" {
      
         from_port = var.server_port
         to_port = var.server_port
-        protocol = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
+        protocol = local.tcp_protocol
+        cidr_blocks = local.all_ips
      }
 
 }
